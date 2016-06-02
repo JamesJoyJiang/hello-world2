@@ -1,0 +1,52 @@
+
+aa=`sed -n '5,1p' POSCAR_4`
+bb=`echo ${aa:0-6:6}`
+a_start=$bb
+
+#rm -rf  Fe_14; mkdir  Fe_14; cd Fe_14;
+#ln -s ../INCAR ../KPOINTS ../POTCAR  ../Myscript .
+#cp ../POSCAR_14 POSCAR
+#qsub /Myscript
+#exit
+
+multa_u=1.1
+multa_l=0.9
+
+
+
+dgrid_a=8
+
+
+at_pos=POSCAR
+ 
+ 
+ 
+# ### Generate loops <><><><><><><><><><><><><><><><><><><><><><> ### 
+math1=`echo $a_start*$multa_l | bc -l | awk  '{printf("%.4f",$1)}'`
+math2=`echo $a_start*$multa_u | bc -l | awk  '{printf("%.4f",$1)}'`
+math3=`echo $math2-$math1     | bc -l | awk  '{printf("%.4f",$1)}'`
+(( dgrid_a = dgrid_a-1 ));
+math4=`echo $math3/$dgrid_a   | bc -l | awk  '{printf("%.4f",$1)}'`
+math5=`echo $math4/2   | bc -l | awk  '{printf("%.4f",$1)}'`
+math6=`echo $math2+$math5   | bc -l | awk  '{printf("%.4f",$1)}'`
+a_loop=`seq -w $math1 $math4 $math6` 
+echo $a_loop
+
+module load python
+python read_energy.py $a_loop
+exit 
+
+
+rm -rf  Fe_14; mkdir  Fe_14; cd Fe_14;
+pwd
+for a in $a_loop
+do
+rm -rf  Fe_4_$a; mkdir  Fe_4_$a; cd Fe_4_$a;
+
+ln -s ../../INCAR ../../KPOINTS ../../POTCAR   ../../Myscript .
+cp ../../POSCAR_4 POSCAR
+
+sed  "5s/^.*$/                        0 0 $a/"  POSCAR>POSCAR_temp;   mv POSCAR_temp POSCAR;
+qsub Myscript; 
+cd ..
+done

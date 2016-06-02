@@ -1,0 +1,327 @@
+#!/bin/bash                                   
+#PBS -S /bin/bash       
+#PBS -o stdout_file
+#PBS -e stderr_file                     
+#PBS -l walltime=20:55:59,nodes=8:ppn=8   
+#PBS -m abe 
+#PBS -M jiang975@umn.edu 
+#PBS -N junction_new_a 
+#ulimit -s unlimited
+
+ulimit -s unlimited                                               
+#cd $PBS_O_WORKDIR  
+
+echo "current workspace is `pwd`"
+
+
+#ulimit -s unlimited
+
+module load gcc/4.9.2
+module load intel/2015/update3
+module load impi/5.0.3.048/intel  
+#module load vasp/5.3.5
+
+
+date
+
+spin_num=2;  #spin_num=1 nonmagnetic, spin_num=2  spin polarized calculation
+VASPwithWANNIERexe=~/work2016/vasp_std
+WANNIERexe=~/work2016/wannier90.x
+
+
+VASP541=/soft/vasp/5.3.5/vasp
+#VASP541=/panfs/roc/groups/0/lowt/jiang975/mehmet/vasp_builds/vasp.5.4.1/itasca/vasp_std
+
+AAA=" 5 6"
+set -- $AAA;  if  [ $1 = 0 ];  then rm -rf   Onestep-junction_long2;  mkdir  Onestep-junction_long2; fi  # AAA(1)=1 means first run , thus VASP calculations are needed.
+
+cd Onestep-junction_long2
+
+
+for i in $AAA
+do
+runstep=$i ;    
+case  "$runstep" in
+
+0)
+
+cp ../POSCAR_long POSCAR 
+ln -s ../POTCAR .
+
+echo "
+NPAR=4
+#MAGMAG= 13*1.0 3*0 3*0
+
+#LWANNIER90=.TRUE. 
+#LWRITE_UNK=.TRUE. 
+#IBRION = -1;
+
+  Nbands=128
+   PREC = Normal
+   ENCUT = 400.000
+  IBRION = 2; NSW = 100; ISIF = 3
+  NELMIN = 2
+   EDIFF = 1.0e-06
+  EDIFFG = -0.02
+ VOSKOWN = 1
+  NBLOCK = 1
+  NWRITE = 1
+    NELM = 90
+    ALGO = Normal (blocked Davidson)
+   ISPIN = 1
+  INIWAV = 1
+  ISTART = 0
+  ICHARG = 2
+   LWAVE = .FALSE.
+#  LCHARG = .FALSE.
+ ADDGRID = .FALSE.
+LHYPERFINE = .FALSE.
+  ISMEAR = 1
+   SIGMA = 0.2
+LREAL = Auto
+# LREAL = .FALSE.
+RWIGS = 1.17 1.36 0.73
+">INCAR
+
+cat > KPOINTS0 <<EOF
+kpts
+ 0
+G
+6  6  2
+ 0 0 0
+EOF
+
+
+cat > KPOINTS3 <<EOF
+k-points along high symmetry lines
+100  ! # pts
+Line-mode
+Reciprocal lattice
+
+
+0.5000000000     0.0000000000     0.0000000000    ! K1
+0.0000000000     0.0000000000     0.0000000000     ! G
+
+0.0000000000     0.0000000000     0.0000000000   ! G
+0.5000000000     0.5000000000     0.0000000000  ! K2
+
+0.5000000000     0.5000000000     0.0000000000  ! K2
+0.5000000000     0.5000000000     0.5000000000  ! K3
+
+0.5000000000     0.5000000000     0.5000000000   ! K3
+ 0.0000000000     0.0000000000     0.5000000000  ! K4
+EOF
+
+cp KPOINTS0 KPOINTS;  
+cp KPOINTS KPOINTS1;   
+cp KPOINTS KPOINTS2;  
+
+
+cp INCAR INCAR1_1;  cp INCAR INCAR0; 
+
+sed 's/#MAGMAG/MAGMAG /1' INCAR1_1>INCAR_tem;  mv INCAR_tem INCAR1_1;
+sed 's/ISPIN = 1/ISPIN = 2 /1' INCAR1_1>INCAR_tem;  mv INCAR_tem INCAR1_1;
+sed 's/  ICHARG = 2/  ICHARG = 1/1' INCAR1_1>INCAR_tem;  mv INCAR_tem INCAR1_1;
+
+sed 's/ EDIFF = 1.0e-06/ EDIFF = 1.0e-08 /1' INCAR1_1>INCAR_tem;  mv INCAR_tem INCAR1_2;
+sed 's/#IBRION = -1;/IBRION = -1;/1' INCAR1_2>INCAR_tem;  mv INCAR_tem INCAR1_2;
+sed 's/  IBRION = 2; NSW = 100; ISIF = 3/ #IBRION = 2; NSW = 100; ISIF = 3/1' INCAR1_2>INCAR_tem;  mv INCAR_tem INCAR1_2;
+
+cp  INCAR1_2  INCAR_tem1
+sed 's/  ICHARG = 1/ICHARG = 11 /1'  INCAR_tem1>INCAR_tem;  mv INCAR_tem INCAR_tem1;
+
+cp INCAR_tem1 INCAR2;   cp INCAR_tem1 INCAR3; 
+
+sed 's/#LWRITE_UNK/LWRITE_UNK /1' INCAR2>INCAR_tem; mv INCAR_tem INCAR2;
+sed 's/#LWANNIER90/LWANNIER90/1' INCAR2>INCAR_tem; mv INCAR_tem INCAR2;
+sed 's/NPAR=4/#NPAR=4/1' INCAR2>INCAR_tem; mv INCAR_tem INCAR2;
+
+
+mpirun $VASP541 | tee vasp.out
+
+date
+
+;;
+1)
+#-------------------------------------------------------------- ###
+
+cp POSCAR POSCAR0
+cp CONTCAR POSCAR
+cp  INCAR1_1 INCAR
+cp KPOINTS1 KPOINTS;  
+
+
+echo "Doing vasp calculation 1.1"
+
+
+mpirun $VASP541 | tee -a vasp.out
+echo "step 1.1"
+
+cp POSCAR POSCAR1_1
+cp CONTCAR POSCAR
+cp  INCAR1_2 INCAR
+echo "Doing vasp calculation 1.2"
+
+mpirun $VASP541 | tee -a vasp.out
+echo "step 1.2"
+date
+
+;;
+2)
+
+cp KPOINTS2 KPOINTS
+cp  INCAR2 INCAR
+
+
+echo "
+num_bands         =   128 
+num_wann          =   102
+
+
+bands_plot        = true
+bands_plot_format xmgrace
+
+
+dis_num_iter      =  30000
+dis_conv_tol      =  1.0E-12
+dis_win_min       = -15.0
+dis_win_max       =  25.0
+dis_froz_max      =  8.0
+dis_froz_min      = -5.0
+
+conv_window=2
+conv_tol          = 1.0E-12
+num_iter          = 100400
+num_print_cycles  = 10
+write_xyz = true
+
+guiding_centres = true
+#kmesh_tol=0.00001
+#search_shells=16
+
+
+#restart=plot
+hr_plot=true
+wannier_plot=T
+#wannier_plot_supercell=3
+#wannier_plot_list=1-5
+
+
+
+
+#dis_mix_ratio = 1.0
+#dis_mix_ratio = 1.0
+
+
+
+#Fermi_energy     $efermi 
+
+
+
+
+begin kpoint_path
+K1 0.5000000000     0.0000000000     0.0000000000  G 0.0000000000     0.0000000000     0.0000000000  
+G 0.0000000000     0.0000000000     0.0000000000  K2 0.5000000000     0.5000000000     0.0000000000 
+K2 0.5000000000     0.5000000000     0.0000000000  K3 0.5000000000     0.5000000000     0.5000000000
+K3 0.5000000000     0.5000000000     0.5000000000  K4 0.0000000000     0.0000000000     0.5000000000
+end kpoint_path
+
+Begin Projections     
+Fe:  sp3-1,d
+#O: l=1
+#Mg: sp3-1,s
+O: sp3
+Mg: sp3 
+End Projections       
+
+mp_grid : 6 6 4
+
+" > wannier90.win 
+#awk "NR>4" wannier90.win >> wannier90a.win
+#mv wannier90a.win wannier90.win
+
+
+
+
+$VASPwithWANNIERexe   | tee -a  vasp.out
+#mpirun $VASPwithWANNIERexe   | tee -a  vasp.out
+
+myfile="wannier90.mmn"
+
+#if [ ! -f "$myfile" ]; then
+#    echo "step 2"
+#    exit
+#fi
+
+
+echo "step 2"
+
+date
+
+;;
+3)
+
+
+
+cp INCAR3 INCAR;
+cp KPOINTS3 KPOINTS;
+
+
+mpirun $VASP541 | tee -a  vasp.out
+echo "step 3"
+date
+
+;;
+4)
+
+
+module load python
+python ~/work2016/read_vasprunxml.py
+
+echo 'step 4:  dft band-structure:   read '
+date
+
+;;
+
+5)
+
+echo "Doing wannier calculation"
+if [ $spin_num = 2 ];   then
+
+    cp wannier90.win wannier90.up.win
+    $WANNIERexe -pp wannier90.up
+    $WANNIERexe     wannier90.up
+
+
+    cp wannier90.win wannier90.dn.win
+   $WANNIERexe -pp wannier90.dn
+    $WANNIERexe     wannier90.dn
+
+else
+   
+
+$WANNIERexe -pp wannier90
+$WANNIERexe     wannier90
+
+fi
+
+
+
+echo "step 5: wannierization done"
+date
+
+;;
+6)
+
+module load python
+echo 'step 6: plotting figure' 
+python ~/work2016/plotter_wan.py 
+echo "step 6: plot done"
+date
+;;
+esac
+done
+
+
+
+
